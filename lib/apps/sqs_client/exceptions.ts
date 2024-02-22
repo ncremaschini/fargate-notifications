@@ -1,0 +1,12 @@
+export class SQSCreateException extends Error {}
+export class SQSDeleteException extends Error {}
+export class GetSQSAttributeException extends Error {}
+export class SetSQSPolicyException extends Error {}
+export class SetDLQPolicyException extends Error {}
+export class ReceiveSQSMessageException extends Error {}
+export class SubscribeToSNSException extends Error {}
+export class UnSubscribeFromSNSException extends Error {}
+export class ParseMessageException extends Error {}
+export class DeleteQueueMessageException extends Error {}
+export class PutMetricAlarmException extends Error {}
+export class DeleteAlarmsException extends Error {};

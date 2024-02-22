@@ -1,0 +1,29 @@
+type Query {
+    getStatus(id: ID!): Status @aws_api_key
+    listStatus: [Status] @aws_api_key
+}
+
+type Mutation {
+    addStatus(input: AddStatusInput): Status @aws_api_key
+    updateStatus(input: UpdateStatusInput): Status @aws_api_key
+    deleteStatus(id: ID!): Status @aws_api_key
+}
+
+type Subscription {
+    onAddStatus: Status @aws_subscribe(mutations: ["addStatus"])
+    onUpdateStatus: Status @aws_subscribe(mutations: ["updateStatus"])
+}
+
+type Status {
+    id: ID
+    status: String!
+}
+
+input AddStatusInput {
+    status: String!
+}
+
+input UpdateStatusInput {
+    id: ID!
+    status: String!
+}
