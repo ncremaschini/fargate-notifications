@@ -1,8 +1,13 @@
-# Welcome to your CDK TypeScript project
+# Welcome to Fargate Notifications CDK project!
 
-This is a blank project for CDK development with TypeScript.
+README is not ready yet. But you can check the code and try to deploy it.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+Meanwhile, here the HL architecture of the project:
+
+![Architecture](./docs/hld.jpg)
+
+## How to deploy
+WIP
 
 ## Useful commands
 
