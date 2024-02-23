@@ -1,6 +1,6 @@
 # Welcome to Fargate Notifications CDK project!
 
-This project is a simple CDK project that deploys a Fargate service with containers that receive notification of dybamic changes leveraging fan-out pattern based on SNS and SQS.
+This project is a simple CDK project that deploys a Fargate service with containers that receive notification of dynamic changes leveraging fan-out pattern based on SNS and SQS.
 
 ## The project
 The scope of the project is to measure time taken by each components in the chain to process events down to the Fargate service. The project is composed by the following components:
@@ -37,6 +37,25 @@ Use the .env file to set the environment variables. The following variables are 
 - SQS_VISIBILITY_TIMEOUT: the visibility timeout in seconds for the SQS queues
 - SQS_RECEIVE_MESSAGE_WAIT_SECONDS: the time in seconds to wait for messages to be available in the SQS queues before polling again
 - SQS_MAX_RECEIVE_COUNT: the maximum number of times a message can be received before being sent to the DLQ
+
+At the first run you need to bootstrap the CDK environment with the following command:
+```bash
+npx cdk bootstrap
+```
+
+Then you can deploy the stack with the following command:
+```bash
+npx cdk deploy
+```
+Since i wanted to have fargate tasks marked as healty when their SQS were deployed, SQS queues, SQS subscriptions and alarms are created within the task container using SDK.
+Then the contaiern handles the SIGTERM signal to delete the SQS subscriptions and the queues before the container is stopped.
+This works well while scaling up and down, but not when you destroy the stack because SIGKILL is sent to the container and the cleanup is not performed.
+To avoid this i suggest to perform a deploy setting the desired tasks to 0, then wait for the tasks to be stopped and then destroy the stack.
+If you forgot to scaledown to 0 the tasks, you can use the following command to clean up remaining resources:
+
+```bash
+./scripts/cleanup.sh
+```
 
 ## Useful commands
 
