@@ -61,21 +61,22 @@ export class SqsService {
   statusDlqUrl: string;
   statusDlqName: string;
   statusDlqArn: string;
+  taskID: string;
   
   SNS_ARN = process.env["STATUS_CHANGE_SNS_ARN"];
   SQS_VISIBILITY_TIMEOUT_SECONDS = process.env["SQS_VISIBILITY_TIMEOUT_SECONDS"];
   SQS_RECEIVE_MESSAGE_WAIT_SECONDS = process.env["SQS_RECEIVE_MESSAGE_WAIT_SECONDS"];
   SQS_MAX_RECEIVE_COUNT = process.env["SQS_MAX_RECEIVE_COUNT"];
   
-  bootrapSQS = async (queueName: string) => {
-    
-    this.statusDlqName = queueName + "-dlq";
+  bootrapSQS = async (taskId: string) => {
+    this.taskID = taskId;
+    this.statusDlqName = taskId + "-dlq";
     this.statusDlqUrl = await this.createSqs(this.statusDlqName);
     this.statusDlqArn = await this.getSQSAttributes(this.statusDlqUrl);
 
     console.log("status DLQ URL: ", this.statusDlqUrl);
 
-    this.statusQueueUrl = await this.createSqs(queueName, this.statusDlqArn);
+    this.statusQueueUrl = await this.createSqs(taskId, this.statusDlqArn);
     this.statusQeueArn = await this.getSQSAttributes(this.statusQueueUrl);
     console.log("status SQS URL: ", this.statusQueueUrl);
 
@@ -141,7 +142,8 @@ export class SqsService {
           }),
         },
         tags: {
-          app: "fargate-notification"
+          app: "fargate-notification",
+          taskId: this.taskID
         }
       };
 
@@ -206,7 +208,6 @@ export class SqsService {
         Attributes: {
           Policy: policy,
         },
-
       };
 
       const setCommand = new SetQueueAttributesCommand(setCommandInput);
@@ -400,6 +401,10 @@ export class SqsService {
         {
           Key: "app",
           Value: "fargate-notification"
+        },
+        {
+          Key: "taskId",
+          Value: this.taskID
         }
       ]
     });

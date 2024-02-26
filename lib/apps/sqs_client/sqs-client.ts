@@ -13,7 +13,7 @@ const app = express();
 const port = 80;
 
 let server: Server;
-let queueName: string;
+let taskId: string;
 let processedMessages: number;
 let discardedMessages: number;
 
@@ -26,7 +26,7 @@ app.get("/sqs", (req: Request, res: Response) => {
     ? res
         .status(200)
         .send(
-          `SQS Listener for queue ${queueName}.\nReceived messages: ${processedMessages}\nDiscarded messages: ${discardedMessages}.\nLast received message:\n ` +
+          `SQS Listener for queue ${taskId}.\nReceived messages: ${processedMessages}\nDiscarded messages: ${discardedMessages}.\nLast received message:\n ` +
             JSON.stringify(lastMessage,null,2)
         )
     : res.status(503).send("Server shutting down");
@@ -36,15 +36,15 @@ const sqsService = new SqsService();
 
 getFargateTaskId()
   .then((fargateTaskId) => {
-    queueName = fargateTaskId;
+    taskId = fargateTaskId;
     processedMessages = 0;
     discardedMessages = 0;
     sqsService
-      .bootrapSQS(queueName)
+      .bootrapSQS(taskId)
       .then((statusQueueUrl) => {
         server = app.listen(port, () =>
           console.log(
-            `SQS Listener for queue ${queueName} listening on port ${port}!`
+            `SQS Listener for queue ${taskId} listening on port ${port}!`
           )
         );
         refreshInterval = setInterval(
