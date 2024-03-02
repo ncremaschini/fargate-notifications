@@ -49,8 +49,8 @@ getFargateTaskId()
             `SQS Listener for queue ${taskId} listening on port ${port}!`
           )
         );
-        refreshInterval = setInterval(async () => await receiveMessages(statusQueueUrl),SQS_INTERVAL_POLLING_MILLIS!
-        );
+
+        refreshInterval = setInterval(async () => await receiveMessages(statusQueueUrl),SQS_INTERVAL_POLLING_MILLIS!);
       })
       .catch((err: any) => {
         console.error(err);
@@ -67,7 +67,7 @@ const gracefulShutdownHandler = function gracefulShutdownHandler(signal: any) {
   ONLINE = false;
 
   setTimeout(() => {
-    clearInterval(refreshInterval);
+    //clearInterval(refreshInterval);
     console.log(
       "🤞 Requesting AWS resources destroy. it can take up to 60 seconds to complete"
     );
@@ -162,7 +162,8 @@ async function receiveMessages(statusQueueUrl: string) {
         receivedByClientAt: clientReceivedDate!.toISOString(),
         snsTimeTakenInMillis: snsTimeTakenInMillis,
         sqsTimeTakenInMillis: sqsTimeTakenInMillis,
-        snsToClientTimeTakenInMillis: snsTimeTakenInMillis! + sqsTimeTakenInMillis!
+        snsToClientTimeTakenInMillis: snsTimeTakenInMillis! + sqsTimeTakenInMillis!,
+        openPollings: openPollings,
       };
 
       await sqsService.deleteMessage(
@@ -172,10 +173,11 @@ async function receiveMessages(statusQueueUrl: string) {
       processedMessages++;
       //its required to print out the message to the console to be able to see it in the logs and let cloudwatch filter it
       console.log(JSON.stringify(lastMessage));
-      console.log("openPollings: " + openPollings);
     }
   } catch (e: any) {
     console.error("Error handling messages ", e);
     discardedMessages++;
   }
+
+  return;
 }
