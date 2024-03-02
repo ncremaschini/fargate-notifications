@@ -14,6 +14,7 @@ export type ConfigProps = {
     SQS_VISIBILITY_TIMEOUT_SECONDS: string;
     SQS_RECEIVE_MESSAGE_WAIT_SECONDS: string;
     SQS_MAX_RECEIVE_COUNT: string;
+    STREAM_PROCESSOR_LAMBDA_MEMORY: string;
     
 };
 
@@ -27,6 +28,7 @@ export const getConfig = (): ConfigProps => ({
     SQS_VISIBILITY_TIMEOUT_SECONDS: process.env.SQS_VISIBILITY_TIMEOUT_SECONDS || "30",
     SQS_RECEIVE_MESSAGE_WAIT_SECONDS: process.env.SQS_RECEIVE_MESSAGE_WAIT_SECONDS || "20",
     SQS_MAX_RECEIVE_COUNT: process.env.SQS_MAX_RECEIVE_COUNT || "10",
+    STREAM_PROCESSOR_LAMBDA_MEMORY: process.env.STREAM_PROCESSOR_LAMBDA_MEMORY || "128",
 });
 
 export type ApplicatioProps = {

@@ -19,7 +19,7 @@ export function createStreamProcessor(
     entry: resolve(__dirname, "apps/stream_processor/stream-processor.ts"),
     functionName: 'dynamoLambdaTrigger',
     handler: 'handler',
-    memorySize: 128,
+    memorySize: +configProps.STREAM_PROCESSOR_LAMBDA_MEMORY,
     runtime: lambda.Runtime.NODEJS_20_X,
     timeout: cdk.Duration.seconds(2),
     bundling: {

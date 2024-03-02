@@ -29,4 +29,14 @@ export function createSqsProcessorTimetakenMetric(
     defaultValue: 0,
     unit: cloudwatch.Unit.MILLISECONDS,
   });
+
+  new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-3", {
+    logGroup: appProps.queueProcessorLogGroup!,
+    metricNamespace: "Fgnt",
+    metricName: "openPollings",
+    filterPattern: logs.FilterPattern.exists("$.openPollings"),
+    metricValue: "$.openPollings",
+    defaultValue: 0,
+    unit: cloudwatch.Unit.COUNT,
+  });
 }

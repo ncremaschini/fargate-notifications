@@ -16,8 +16,9 @@ let server: Server;
 let taskId: string;
 let processedMessages: number;
 let discardedMessages: number;
+let openPollings: number;
 
-const SQS_INTERVAL_POLLING_MILLIS = process.env["SQS_INTERVAL_POLLING_MILLIS"];
+const SQS_INTERVAL_POLLING_MILLIS = +process.env["SQS_INTERVAL_POLLING_MILLIS"]!;
 
 let refreshInterval: string | number | NodeJS.Timeout | undefined;
 
@@ -26,7 +27,7 @@ app.get("/sqs", (req: Request, res: Response) => {
     ? res
         .status(200)
         .send(
-          `SQS Listener for queue ${taskId}.\nReceived messages: ${processedMessages}\nDiscarded messages: ${discardedMessages}.\nLast received message:\n ` +
+          `SQS Listener for queue ${taskId}.\nOpen pollings: ${openPollings}\nReceived messages: ${processedMessages}\nDiscarded messages: ${discardedMessages}.\nLast received message:\n ` +
             JSON.stringify(lastMessage,null,2)
         )
     : res.status(503).send("Server shutting down");
@@ -39,6 +40,7 @@ getFargateTaskId()
     taskId = fargateTaskId;
     processedMessages = 0;
     discardedMessages = 0;
+    openPollings = 0;
     sqsService
       .bootrapSQS(taskId)
       .then((statusQueueUrl) => {
@@ -47,9 +49,7 @@ getFargateTaskId()
             `SQS Listener for queue ${taskId} listening on port ${port}!`
           )
         );
-        refreshInterval = setInterval(
-          async () => await receiveMessages(statusQueueUrl),
-          +SQS_INTERVAL_POLLING_MILLIS!
+        refreshInterval = setInterval(async () => await receiveMessages(statusQueueUrl),SQS_INTERVAL_POLLING_MILLIS!
         );
       })
       .catch((err: any) => {
@@ -114,12 +114,13 @@ async function getFargateTaskId() {
 
 async function receiveMessages(statusQueueUrl: string) {
   try {
+    openPollings++;
     const messages: Array<Message> = await sqsService.receiveMessage(
       statusQueueUrl
     );
     
     for (const message of messages) {
-      
+      openPollings--;
       let messageBody = JSON.parse(message.Body!);
       let statusBody = JSON.parse(messageBody.Message);
       
@@ -144,10 +145,6 @@ async function receiveMessages(statusQueueUrl: string) {
         let snsReceivedDate = new Date(snsReceivedISODate);
         snsReceivedTimestamp = snsReceivedDate.getTime();
         
-        console.log("clientReceivedTimestamp: " + clientReceivedTimestamp);
-        console.log("sqsReceivedTimestamp: " + sqsReceivedTimestamp);
-        console.log("snsReceivedTimestamp: " + snsReceivedTimestamp);
-
         clientReceivedDate = new Date(clientReceivedTimestamp!);
         sqsReceivedDate = new Date(sqsReceivedTimestamp!);
         
@@ -173,7 +170,9 @@ async function receiveMessages(statusQueueUrl: string) {
         message.ReceiptHandle as string
       );
       processedMessages++;
+      //its required to print out the message to the console to be able to see it in the logs and let cloudwatch filter it
       console.log(JSON.stringify(lastMessage));
+      console.log("openPollings: " + openPollings);
     }
   } catch (e: any) {
     console.error("Error handling messages ", e);
