@@ -34,10 +34,11 @@ Use the .env file to set the environment variables. The following variables are 
 - DESIRED_TASKS: the desired number of tasks to run in the Fargate service
 - TASK_CPU: the CPU units to allocate to the tasks
 - TASK_MEMORY: the memory to allocate to the tasks
-- SQS_INTERVAL_POLLING_MILLIS: the interval in milliseconds to poll the SQS queues
+- STATS_PRINT_MILLIS: the interval in milliseconds to print sqs client's stats
 - SQS_VISIBILITY_TIMEOUT: the visibility timeout in seconds for the SQS queues
 - SQS_RECEIVE_MESSAGE_WAIT_SECONDS: the time in seconds to wait for messages to be available in the SQS queues before polling again
 - SQS_MAX_RECEIVE_COUNT: the maximum number of times a message can be received before being sent to the DLQ
+- STREAM_PROCESSOR_LAMBDA_MEMORY: Dynamo stream processor lambda memory
 
 At the first run you need to bootstrap the CDK environment with the following command:
 ```bash
@@ -49,7 +50,9 @@ Then you can deploy the stack with the following command:
 npx cdk deploy
 ```
 Since i wanted to have fargate tasks marked as healty when their SQS were deployed, SQS queues, SQS subscriptions and alarms are created within the task container using SDK.
-In order to "bundle" tasks with related resources, all resources created by the task with SDK has been tagged with the `task id`, so you can easily identify them.
+In order to "bundle" tasks with related resources, all resources created by the task with SDK has been tagged with the `task id`, so you can easily identify them. 
+Queues are also named as `task id` and `task id`-`dlq`.
+
 The container handles the `SIGTERM` signal to delete the SQS subscriptions and the queues before the container is stopped.
 This works well while scaling up and down, but not when you destroy the stack because `SIGKILL` is sent to the container and the cleanup is not performed.
 To avoid this i suggest to perform a deploy setting the desired tasks to 0, then wait for the tasks to be stopped and then destroy the stack.
@@ -78,8 +81,6 @@ Since application is behind a load balancer, at each invocation the request is r
 
 ## How to monitor
 As messages starts to flow in the system deployed metrics filters start to grab informations, so you can create a dashboard to monitor the application using custom metrics created under `Fgnt` namespace and called `sqsTimeTaken` and `snsTimeTaken`, along with provided metrics such as `CPUUtilization` and `MemoryUtilization`.
-
-When tasks are scaled up and down 
 
 
 ## Useful commands

@@ -153,7 +153,7 @@ function createSqsService(
       }),
       environment: {
         STATUS_CHANGE_SNS_ARN: appProps.statusTopic?.topicArn!,
-        SQS_INTERVAL_POLLING_MILLIS: configProps.SQS_INTERVAL_POLLING_MILLIS,
+        STATS_PRINT_MILLIS: configProps.STATS_PRINT_MILLIS,
         SQS_VISIBILITY_TIMEOUT_SECOND:configProps.SQS_VISIBILITY_TIMEOUT_SECONDS,
         SQS_RECEIVE_MESSAGE_WAIT_SECONDS:configProps.SQS_RECEIVE_MESSAGE_WAIT_SECONDS,
         SQS_MAX_RECEIVE_COUNT: configProps.SQS_MAX_RECEIVE_COUNT,

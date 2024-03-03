@@ -18,7 +18,7 @@ let processedMessages: number;
 let discardedMessages: number;
 let openPollings: number;
 
-const SQS_INTERVAL_POLLING_MILLIS = +process.env["SQS_INTERVAL_POLLING_MILLIS"]!;
+const STATS_PRINT_MILLIS = +process.env["STATS_PRINT_MILLIS"]!;
 
 let refreshInterval: string | number | NodeJS.Timeout | undefined;
 
@@ -43,14 +43,19 @@ getFargateTaskId()
     openPollings = 0;
     sqsService
       .bootrapSQS(taskId)
-      .then((statusQueueUrl) => {
+      .then(async (statusQueueUrl) => {
         server = app.listen(port, () =>
           console.log(
             `SQS Listener for queue ${taskId} listening on port ${port}!`
           )
         );
 
-        refreshInterval = setInterval(async () => await receiveMessages(statusQueueUrl),SQS_INTERVAL_POLLING_MILLIS!);
+        refreshInterval = setInterval(printStats, STATS_PRINT_MILLIS);
+
+        while(ONLINE){
+          await receiveMessages(statusQueueUrl);
+        }
+
       })
       .catch((err: any) => {
         console.error(err);
@@ -67,7 +72,7 @@ const gracefulShutdownHandler = function gracefulShutdownHandler(signal: any) {
   ONLINE = false;
 
   setTimeout(() => {
-    //clearInterval(refreshInterval);
+    clearInterval(refreshInterval);
     console.log(
       "🤞 Requesting AWS resources destroy. it can take up to 60 seconds to complete"
     );
@@ -112,15 +117,26 @@ async function getFargateTaskId() {
   return fargateTaskId;
 }
 
+async function printStats() {
+
+  let stats = {
+    openPollings: openPollings,
+    processedMessages: processedMessages,
+    discardedMessages: discardedMessages,
+  }
+
+  console.log(JSON.stringify(stats));
+}
+
 async function receiveMessages(statusQueueUrl: string) {
   try {
     openPollings++;
     const messages: Array<Message> = await sqsService.receiveMessage(
       statusQueueUrl
-    );
+    ); 
+    openPollings--;
     
     for (const message of messages) {
-      openPollings--;
       let messageBody = JSON.parse(message.Body!);
       let statusBody = JSON.parse(messageBody.Message);
       
@@ -163,7 +179,6 @@ async function receiveMessages(statusQueueUrl: string) {
         snsTimeTakenInMillis: snsTimeTakenInMillis,
         sqsTimeTakenInMillis: sqsTimeTakenInMillis,
         snsToClientTimeTakenInMillis: snsTimeTakenInMillis! + sqsTimeTakenInMillis!,
-        openPollings: openPollings,
       };
 
       await sqsService.deleteMessage(
@@ -178,6 +193,5 @@ async function receiveMessages(statusQueueUrl: string) {
     console.error("Error handling messages ", e);
     discardedMessages++;
   }
-
   return;
 }

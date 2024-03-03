@@ -10,7 +10,7 @@ export function createSqsProcessorTimetakenMetric(
   appProps: ApplicatioProps,
   configProps: ConfigProps
 ) {
-  new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter", {
+  new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-1", {
     logGroup: appProps.queueProcessorLogGroup!,
     metricNamespace: "Fgnt",
     metricName: "sqsTimeTaken",
@@ -36,6 +36,26 @@ export function createSqsProcessorTimetakenMetric(
     metricName: "openPollings",
     filterPattern: logs.FilterPattern.exists("$.openPollings"),
     metricValue: "$.openPollings",
+    defaultValue: 0,
+    unit: cloudwatch.Unit.COUNT,
+  });
+
+  new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-4", {
+    logGroup: appProps.queueProcessorLogGroup!,
+    metricNamespace: "Fgnt",
+    metricName: "processedMessages",
+    filterPattern: logs.FilterPattern.exists("$.processedMessages"),
+    metricValue: "$.processedMessages",
+    defaultValue: 0,
+    unit: cloudwatch.Unit.COUNT,
+  });
+
+  new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-5", {
+    logGroup: appProps.queueProcessorLogGroup!,
+    metricNamespace: "Fgnt",
+    metricName: "discardedMessages",
+    filterPattern: logs.FilterPattern.exists("$.discardedMessages"),
+    metricValue: "$.discardedMessages",
     defaultValue: 0,
     unit: cloudwatch.Unit.COUNT,
   });
