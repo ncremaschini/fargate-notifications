@@ -82,6 +82,7 @@ Since application is behind a load balancer, at each invocation the request is r
 ## How to monitor
 As messages starts to flow in the system deployed metrics filters start to grab informations, so you can create a dashboard to monitor the application using custom metrics created under `Fgnt` namespace and called `sqsTimeTakenMillis`, `snsTimeTakenMillis`, `openPollings`,`processedMessages` and `discardedMessages`, along with provided metrics such as `CPUUtilization` and `MemoryUtilization`.
 
+![Stats](./docs/message_stats.png)
 
 ## Useful commands
 
