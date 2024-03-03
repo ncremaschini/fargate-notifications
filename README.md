@@ -80,7 +80,7 @@ The application exposes an endpoint to retrieve single task informations: its ex
 Since application is behind a load balancer, at each invocation the request is routed to a different task, so you can see the load balancing in action.
 
 ## How to monitor
-As messages starts to flow in the system deployed metrics filters start to grab informations, so you can create a dashboard to monitor the application using custom metrics created under `Fgnt` namespace and called `sqsTimeTaken` and `snsTimeTaken`, along with provided metrics such as `CPUUtilization` and `MemoryUtilization`.
+As messages starts to flow in the system deployed metrics filters start to grab informations, so you can create a dashboard to monitor the application using custom metrics created under `Fgnt` namespace and called `sqsTimeTakenMillis`, `snsTimeTakenMillis`, `openPollings`,`processedMessages` and `discardedMessages`, along with provided metrics such as `CPUUtilization` and `MemoryUtilization`.
 
 
 ## Useful commands
