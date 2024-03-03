@@ -12,14 +12,14 @@ The scope of the project is to measure time taken by each components in the chai
 
 ![Architecture](./docs/hld.png)
 
-1. The AppSync API receives the events and stores them in the DynamoDB table
-2. The DynamoDB stream events 
+1. The AppSync API receives mutations and stores derived data in the DynamoDB table
+2. The DynamoDB stream the events 
 3. The Lambda function is triggered by the DynamoDB stream
 4. The Lambda function sends the events to the SNS topic
 5. The SNS topic sends the events to the SQS queues
 6. The Fargate service reads the events from the SQS queues
-7. If events are not processed within a certain time, they are sent to the DLQ
-8. A cloudwatch alarm is triggered if the DLQ is not empty
+7. If events are not processed within a timeout, they are moved to the DLQ
+8. A Cloudwatch alarm is triggered if the DLQ is not empty
 
 Custome metrics are also created to measure the time taken by each component to process the events, so you can use cloudwatch to create dashboards and alarms based on these metrics.
 
