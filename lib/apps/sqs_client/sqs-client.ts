@@ -1,8 +1,10 @@
+import { ISqsService, SqsServiceBase } from "./sqs-service-base";
 import express, { Request, Response } from "express";
 
-import { Message } from "@aws-sdk/client-sqs";
+import { Message, } from "@aws-sdk/client-sqs";
 import { Server } from "http";
-import { SqsService } from "./sqs-service";
+import { SqsServiceEventBridge } from "./sqs-service-eventbridge";
+import { SqsServiceSns } from "./sqs-service-sns";
 
 const gracefulShutdownTime = 6000;
 
@@ -32,8 +34,21 @@ app.get("/sqs", (req: Request, res: Response) => {
         )
     : res.status(503).send("Server shutting down");
 });
+const EVENT_CHANNEL = process.env["EVENT_CHANNEL"];
 
-const sqsService = new SqsService();
+let sqsService: ISqsService;
+
+switch (EVENT_CHANNEL) {
+  case "SNS":
+    sqsService = new SqsServiceSns();
+    break;
+  case "EVENT_BRIDGE":
+    sqsService = new SqsServiceEventBridge();
+    break;
+  default:
+    sqsService = new SqsServiceBase();
+    break;
+}
 
 getFargateTaskId()
   .then((fargateTaskId) => {
@@ -42,7 +57,7 @@ getFargateTaskId()
     discardedMessages = 0;
     openPollings = 0;
     sqsService
-      .bootrapSQS(taskId)
+      .bootstrapSQS(taskId)
       .then(async (statusQueueUrl) => {
         server = app.listen(port, () =>
           console.log(
@@ -131,7 +146,7 @@ async function printStats() {
 async function receiveMessages(statusQueueUrl: string) {
   try {
     openPollings++;
-    const messages: Array<Message> = await sqsService.receiveMessage(
+    const messages: Array<Message> = await sqsService.receiveMessages(
       statusQueueUrl
     ); 
     openPollings--;
