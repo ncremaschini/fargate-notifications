@@ -10,3 +10,5 @@ export class ParseMessageException extends Error {}
 export class DeleteQueueMessageException extends Error {}
 export class PutMetricAlarmException extends Error {}
 export class DeleteAlarmsException extends Error {};
+export class SubscribeSqsToEventBridgeException extends Error {};
+export class UnSubscribeSqsFromEventBridgeException extends Error {};
