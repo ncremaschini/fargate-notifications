@@ -6,7 +6,7 @@ import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as logs from "aws-cdk-lib/aws-logs";
 
-import { ApplicatioProps, ConfigProps } from "./config";
+import { ApplicatioProps, CHANNEL_TYPE_EVENT_BRIDGE, CHANNEL_TYPE_SNS, ConfigProps } from "./config";
 
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
 import { FargateNotificationsStack } from "./fargate-notifications-stack";
@@ -68,13 +68,24 @@ export function createFargateCluster(
     ],
   });
 
-  const sqsTargetGroup = createSqsService(
+  const sns2sqsTargetGroup = createSqsService(
     stack,
     ecsRole,
     appProps,
     configProps,
     albSg,
-    ecsCluster
+    ecsCluster,
+    CHANNEL_TYPE_SNS
+  );
+
+  const ebrdg2sqsTargetGroup = createSqsService(
+    stack,
+    ecsRole,
+    appProps,
+    configProps,
+    albSg,
+    ecsCluster,
+    CHANNEL_TYPE_EVENT_BRIDGE
   );
 
   httplistener.addAction("DefaultAction", {
@@ -84,10 +95,16 @@ export function createFargateCluster(
     }),
   });
 
-  httplistener.addAction("HttpSqsAppAction", {
-    action: elbv2.ListenerAction.forward([sqsTargetGroup]),
-    conditions: [elbv2.ListenerCondition.pathPatterns(["/sqs*"])],
+  httplistener.addAction("HttpSns2SqsAppAction", {
+    action: elbv2.ListenerAction.forward([sns2sqsTargetGroup]),
+    conditions: [elbv2.ListenerCondition.pathPatterns(["/sns*"])],
     priority: 1,
+  });
+
+  httplistener.addAction("HttpEbrdg2SqsAppAction", {
+    action: elbv2.ListenerAction.forward([ebrdg2sqsTargetGroup]),
+    conditions: [elbv2.ListenerCondition.pathPatterns(["/ebrdg*"])],
+    priority: 2,
   });
 
   new cdk.CfnOutput(stack, "fgtnAlbDns", {
@@ -102,11 +119,12 @@ function createSqsService(
   appProps: ApplicatioProps,
   configProps: ConfigProps,
   albSg: cdk.aws_ec2.SecurityGroup,
-  ecsCluster: cdk.aws_ecs.Cluster
+  ecsCluster: cdk.aws_ecs.Cluster,
+  channel_type: string
 ) {
   const sqsClientTaskDefinition = new ecs.FargateTaskDefinition(
     stack,
-    "fgtn-sqs-task-definition",
+    "fgtn-sqs-task-definition-" + channel_type,
     {
       memoryLimitMiB: configProps.TASK_MEMORY,
       cpu: configProps.TASK_CPU,
@@ -129,26 +147,26 @@ function createSqsService(
 
   const sqsClientLogGroup = new logs.LogGroup(
     stack,
-    "fgtn-app-sqs-client-log-group",
+    "fgtn-app-sqs-client-log-group-" + channel_type,
     {
       retention: logs.RetentionDays.ONE_DAY,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
-      logGroupName: "/fgnt/ecs/app/sqs-client",
+      logGroupName: "/fgnt/ecs/app/sqs-client-" + channel_type,
     }
   );
 
   appProps.queueProcessorLogGroup = sqsClientLogGroup;
 
-  const sqsClientImage = new DockerImageAsset(stack, "sqs-client-image", {
+  const sqsClientImage = new DockerImageAsset(stack, "sqs-client-image-" + channel_type, {
     directory: join(__dirname, "apps", "sqs_client"),
   });
 
   const sqsClientContainer = sqsClientTaskDefinition.addContainer(
-    "fgtn-sqs-client-container",
+    "fgtn-sqs-client-container-" + channel_type,
     {
       image: ecs.ContainerImage.fromDockerImageAsset(sqsClientImage),
       logging: ecs.LogDriver.awsLogs({
-        streamPrefix: "sqs-client",
+        streamPrefix: "sqs-client-" + channel_type,
         logGroup: sqsClientLogGroup,
       }),
       environment: {
@@ -157,7 +175,7 @@ function createSqsService(
         SQS_VISIBILITY_TIMEOUT_SECOND:configProps.SQS_VISIBILITY_TIMEOUT_SECONDS,
         SQS_RECEIVE_MESSAGE_WAIT_SECONDS:configProps.SQS_RECEIVE_MESSAGE_WAIT_SECONDS,
         SQS_MAX_RECEIVE_COUNT: configProps.SQS_MAX_RECEIVE_COUNT,
-        EVENT_CHANNEL: configProps.EVENT_CHANNEL,
+        EVENT_CHANNEL: channel_type,
       },
     }
   );
@@ -166,15 +184,15 @@ function createSqsService(
     containerPort: 80,
   });
 
-  const sqsServiceSg = new ec2.SecurityGroup(stack, "fgtn-sqs-service-sg", {
+  const sqsServiceSg = new ec2.SecurityGroup(stack, "fgtn-sqs-service-sg-" + channel_type, {
     vpc: appProps.vpc!,
     allowAllOutbound: true,
-    securityGroupName: "fgtn-ecs-sqs-client-sg",
+    securityGroupName: "fgtn-ecs-sqs-client-sg-" + channel_type,
   });
 
   sqsServiceSg.addIngressRule(albSg, ec2.Port.tcp(80));
 
-  const sqsService = new ecs.FargateService(stack, "fgtn-sqs-service", {
+  const sqsService = new ecs.FargateService(stack, "fgtn-sqs-service-" + channel_type, {
     cluster: ecsCluster,
     taskDefinition: sqsClientTaskDefinition,
     desiredCount: configProps.DESIRED_TASKS,
@@ -194,7 +212,7 @@ function createSqsService(
 
   const sqsTargetGroup = new elbv2.ApplicationTargetGroup(
     stack,
-    "fgtn-sqs-targetGroup",
+    "fgtn-sqs-targetGroup-" + channel_type,
     {
       targets: [sqsService],
       protocol: elbv2.ApplicationProtocol.HTTP,

@@ -21,6 +21,8 @@ let discardedMessages: number;
 let openPollings: number;
 
 const STATS_PRINT_MILLIS = +process.env["STATS_PRINT_MILLIS"]!;
+const CHANNEL_TYPE_SNS = "sns";
+const CHANNEL_TYPE_EVENT_BRIDGE = "ebrdg";
 
 let refreshInterval: string | number | NodeJS.Timeout | undefined;
 
@@ -39,10 +41,10 @@ const EVENT_CHANNEL = process.env["EVENT_CHANNEL"];
 let sqsService: ISqsService;
 
 switch (EVENT_CHANNEL) {
-  case "SNS":
+  case CHANNEL_TYPE_SNS:
     sqsService = new SqsServiceSns();
     break;
-  case "EVENT_BRIDGE":
+  case CHANNEL_TYPE_EVENT_BRIDGE:
     sqsService = new SqsServiceEventBridge();
     break;
   default:

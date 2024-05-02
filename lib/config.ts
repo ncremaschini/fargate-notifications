@@ -4,6 +4,9 @@ import * as logs from "aws-cdk-lib/aws-logs";
 
 dotenv.config();
 
+export const CHANNEL_TYPE_SNS = "sns";
+export const CHANNEL_TYPE_EVENT_BRIDGE = "ebrdg";
+
 export type ConfigProps = {
     MIN_TASKS: number;
     MAX_TASKS: number;
@@ -15,7 +18,6 @@ export type ConfigProps = {
     SQS_RECEIVE_MESSAGE_WAIT_SECONDS: string;
     SQS_MAX_RECEIVE_COUNT: string;
     STREAM_PROCESSOR_LAMBDA_MEMORY: string;
-    EVENT_CHANNEL: string;
 };
 
 export const getConfig = (): ConfigProps => ({
@@ -29,7 +31,6 @@ export const getConfig = (): ConfigProps => ({
     SQS_RECEIVE_MESSAGE_WAIT_SECONDS: process.env.SQS_RECEIVE_MESSAGE_WAIT_SECONDS || "20",
     SQS_MAX_RECEIVE_COUNT: process.env.SQS_MAX_RECEIVE_COUNT || "10",
     STREAM_PROCESSOR_LAMBDA_MEMORY: process.env.STREAM_PROCESSOR_LAMBDA_MEMORY || "128",
-    EVENT_CHANNEL: process.env.EVENT_CHANNEL || "SNS",
 });
 
 export type ApplicatioProps = {
