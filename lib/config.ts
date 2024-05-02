@@ -18,6 +18,7 @@ export type ConfigProps = {
     SQS_RECEIVE_MESSAGE_WAIT_SECONDS: string;
     SQS_MAX_RECEIVE_COUNT: string;
     STREAM_PROCESSOR_LAMBDA_MEMORY: string;
+    CHANNEL_TYPE: string;
 };
 
 export const getConfig = (): ConfigProps => ({
@@ -31,6 +32,7 @@ export const getConfig = (): ConfigProps => ({
     SQS_RECEIVE_MESSAGE_WAIT_SECONDS: process.env.SQS_RECEIVE_MESSAGE_WAIT_SECONDS || "20",
     SQS_MAX_RECEIVE_COUNT: process.env.SQS_MAX_RECEIVE_COUNT || "10",
     STREAM_PROCESSOR_LAMBDA_MEMORY: process.env.STREAM_PROCESSOR_LAMBDA_MEMORY || "128",
+    CHANNEL_TYPE: process.env.CHANNEL_TYPE || CHANNEL_TYPE_SNS,
 });
 
 export type ApplicatioProps = {
@@ -39,6 +41,7 @@ export type ApplicatioProps = {
     statusTable?: cdk.aws_dynamodb.ITable;
     statusStreamProcessor?: cdk.aws_lambda.IFunction;
     statusStreamProcessorSnsDlq? :  cdk.aws_sns.ITopic;
+    statusEventBus?: cdk.aws_events.IEventBus;
     statusGraphQLApi? :cdk.aws_appsync.GraphqlApi;
     queueProcessorLogGroup? : logs.ILogGroup;
  }

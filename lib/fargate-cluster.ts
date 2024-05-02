@@ -6,7 +6,7 @@ import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as logs from "aws-cdk-lib/aws-logs";
 
-import { ApplicatioProps, CHANNEL_TYPE_EVENT_BRIDGE, CHANNEL_TYPE_SNS, ConfigProps } from "./config";
+import { ApplicatioProps, ConfigProps } from "./config";
 
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
 import { FargateNotificationsStack } from "./fargate-notifications-stack";
@@ -75,17 +75,7 @@ export function createFargateCluster(
     configProps,
     albSg,
     ecsCluster,
-    CHANNEL_TYPE_SNS
-  );
-
-  const ebrdg2sqsTargetGroup = createSqsService(
-    stack,
-    ecsRole,
-    appProps,
-    configProps,
-    albSg,
-    ecsCluster,
-    CHANNEL_TYPE_EVENT_BRIDGE
+    configProps.CHANNEL_TYPE
   );
 
   httplistener.addAction("DefaultAction", {
@@ -97,14 +87,8 @@ export function createFargateCluster(
 
   httplistener.addAction("HttpSns2SqsAppAction", {
     action: elbv2.ListenerAction.forward([sns2sqsTargetGroup]),
-    conditions: [elbv2.ListenerCondition.pathPatterns(["/sns*"])],
+    conditions: [elbv2.ListenerCondition.pathPatterns(["/sqs*"])],
     priority: 1,
-  });
-
-  httplistener.addAction("HttpEbrdg2SqsAppAction", {
-    action: elbv2.ListenerAction.forward([ebrdg2sqsTargetGroup]),
-    conditions: [elbv2.ListenerCondition.pathPatterns(["/ebrdg*"])],
-    priority: 2,
   });
 
   new cdk.CfnOutput(stack, "fgtnAlbDns", {
@@ -171,6 +155,7 @@ function createSqsService(
       }),
       environment: {
         STATUS_CHANGE_SNS_ARN: appProps.statusTopic?.topicArn!,
+        STATUS_CHANGE_EVENT_BUS_NAME: appProps.statusEventBus?.eventBusName!,
         STATS_PRINT_MILLIS: configProps.STATS_PRINT_MILLIS,
         SQS_VISIBILITY_TIMEOUT_SECOND:configProps.SQS_VISIBILITY_TIMEOUT_SECONDS,
         SQS_RECEIVE_MESSAGE_WAIT_SECONDS:configProps.SQS_RECEIVE_MESSAGE_WAIT_SECONDS,

@@ -2,6 +2,8 @@ import {
   EventBridgeClient,
   PutTargetsCommand,
   PutTargetsCommandInput,
+  RemoveTargetsCommand,
+  RemoveTargetsCommandInput
 } from "@aws-sdk/client-eventbridge";
 import { ISqsService, LastMessage, SqsServiceBase } from "./sqs-service-base";
 import { SubscribeSqsToEventBridgeException, UnSubscribeSqsFromEventBridgeException } from "./exceptions";
@@ -73,7 +75,7 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
     
     try {
       const putTargetsCommandInput: PutTargetsCommandInput = {
-        Rule: 'SendTOSQS-' + this.taskID,
+        Rule: ruleName,
         EventBusName: eventBusName,
         Targets: [
           {
@@ -94,6 +96,20 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
   }
 
   private unsubscribeSqsFromEventBridge = async (ruleName: string, eventBusName: string) => {
-    
+    try {
+      const removeTargetsCommandInput: RemoveTargetsCommandInput = {
+        Rule: ruleName,
+        EventBusName: eventBusName,
+        Ids: [this.taskID],
+      };
+
+      const cmdOut = await this.eventBridgeClient.send(new RemoveTargetsCommand(removeTargetsCommandInput));
+      if(cmdOut.$metadata.httpStatusCode !== 200) {
+        throw new UnSubscribeSqsFromEventBridgeException("Failed to unsubscribe from EventBridge");
+      }
+
+    } catch (e: any) {
+      throw new UnSubscribeSqsFromEventBridgeException(e.message);
+    }
   }
 }
