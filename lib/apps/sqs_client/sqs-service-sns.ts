@@ -1,4 +1,5 @@
-import { ISqsService, SqsServiceBase } from "./sqs-service-base";
+import { ISqsService, LastMessage, SqsServiceBase } from "./sqs-service-base";
+import { Message, SetQueueAttributesCommand } from "@aws-sdk/client-sqs";
 import {
   SNSClient,
   SubscribeCommand,
@@ -12,7 +13,11 @@ import {
   UnSubscribeFromSNSException
 } from "./exceptions";
 
-import { SetQueueAttributesCommand } from "@aws-sdk/client-sqs";
+export class LastMessageSns extends LastMessage {
+  sentToSnsAt: string;
+  snsTimeTakenInMillis: number;
+  snsToClientTimeTakenInMillis: number;
+};
 
 export class SqsServiceSns extends SqsServiceBase implements ISqsService{
   constructor() {
@@ -40,6 +45,38 @@ export class SqsServiceSns extends SqsServiceBase implements ISqsService{
     await super.tearDownSQS();
     await this.deleteSqsSnsSubscription(this.snsSubscriptionArn!);
   };
+
+  public parseMessage(message: Message): LastMessage {
+
+    let lastMessage: LastMessage = super.parseMessage(message);
+
+    let messageBody = JSON.parse(message.Body!);
+            
+    //despite the name, this is the ISO Date the message was sent to the SNS topic
+    let snsReceivedISODate = messageBody.Timestamp;
+      
+    let snsReceivedTimestamp;
+    let snsTimeTakenInMillis;
+      
+    if (snsReceivedISODate && message.Attributes) {
+          
+      let snsReceivedDate = new Date(snsReceivedISODate);
+      snsReceivedTimestamp = snsReceivedDate.getTime();
+              
+      snsTimeTakenInMillis = lastMessage.sqsReceivedTimestamp - snsReceivedTimestamp;
+        
+    }else{
+      console.warn("Message does not have SentTimestamp attribute");
+    }
+    let lastMessageSns: LastMessageSns = {
+      ...lastMessage,
+      sentToSnsAt: snsReceivedISODate,
+      snsTimeTakenInMillis: snsTimeTakenInMillis || 0,
+      snsToClientTimeTakenInMillis: (snsTimeTakenInMillis || 0) + (lastMessage.sqsTimeTakenInMillis || 0),
+    };
+
+    return lastMessageSns;
+  }
 
   private setSNSPolicy = async (
     queueArn: string,

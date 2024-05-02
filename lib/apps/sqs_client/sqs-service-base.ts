@@ -36,7 +36,16 @@ export interface ISqsService {
   receiveMessages(queueUrl: string): Promise<Message[]>;
   deleteMessage(queueUrl: string, receiptHandle: string): Promise<void>;
   deleteMessages(queueUrl: string,messages:Message[]): Promise<void>;
+  parseMessage(message: Message): LastMessage;
 }
+
+export class LastMessage {
+  message: string;
+  receivedByClientAt: string;
+  receivedBySqsAt: string;
+  sqsReceivedTimestamp: any;
+  sqsTimeTakenInMillis: number;
+};
 
 export class SqsServiceBase implements ISqsService {
   protected sqsClient: SQSClient;
@@ -141,6 +150,45 @@ export class SqsServiceBase implements ISqsService {
         }
       }
     }
+  }
+
+  public parseMessage(message: Message): LastMessage {
+    let messageBody = JSON.parse(message.Body!);
+    let statusBody = JSON.parse(messageBody.Message);
+      
+    let status = statusBody.status;
+      
+    //despite the name, this is the ISO Date the message was sent to the SNS topic
+    let snsReceivedISODate = messageBody.Timestamp;
+      
+    let clientReceivedTimestamp;
+    let clientReceivedDate;
+    let sqsReceivedTimestamp;
+    let sqsReceivedDate;
+    let sqsTimeTakenInMillis;
+      
+    if (snsReceivedISODate && message.Attributes) {
+        
+      clientReceivedTimestamp = +message.Attributes.ApproximateFirstReceiveTimestamp!;
+      sqsReceivedTimestamp = +message.Attributes.SentTimestamp!;
+          
+      clientReceivedDate = new Date(clientReceivedTimestamp!);
+      sqsReceivedDate = new Date(sqsReceivedTimestamp!);
+      
+      sqsTimeTakenInMillis = clientReceivedTimestamp - sqsReceivedTimestamp;
+        
+    }else{
+      console.warn("Message does not have SentTimestamp attribute");
+    }
+    let lastMessage: LastMessage = {
+      message: status,
+      receivedBySqsAt: sqsReceivedDate!.toISOString(),
+      receivedByClientAt: clientReceivedDate!.toISOString(),
+      sqsTimeTakenInMillis: sqsTimeTakenInMillis || 0,
+      sqsReceivedTimestamp: sqsReceivedTimestamp,
+    };
+
+    return lastMessage;
   }
 
   private async deleteQueue(queueUrl: string){

@@ -146,56 +146,15 @@ async function printStats() {
 async function receiveMessages(statusQueueUrl: string) {
   try {
     openPollings++;
-    const messages: Array<Message> = await sqsService.receiveMessages(
-      statusQueueUrl
-    ); 
+
+    const messages: Array<Message> = await sqsService.receiveMessages(statusQueueUrl);
+
     openPollings--;
     
     for (const message of messages) {
-      let messageBody = JSON.parse(message.Body!);
-      let statusBody = JSON.parse(messageBody.Message);
-      
-      let status = statusBody.status;
-      
-      //despite the name, this is the ISO Date the message was sent to the SNS topic
-      let snsReceivedISODate = messageBody.Timestamp;
-      
-      let clientReceivedTimestamp;
-      let clientReceivedDate;
-      let sqsReceivedTimestamp;
-      let sqsReceivedDate;
-      let snsReceivedTimestamp;
-      let snsTimeTakenInMillis;
-      let sqsTimeTakenInMillis;
-    
-      if (snsReceivedISODate && message.Attributes) {
-    
-        clientReceivedTimestamp = +message.Attributes.ApproximateFirstReceiveTimestamp!;
-        sqsReceivedTimestamp = +message.Attributes.SentTimestamp!;
-        
-        let snsReceivedDate = new Date(snsReceivedISODate);
-        snsReceivedTimestamp = snsReceivedDate.getTime();
-        
-        clientReceivedDate = new Date(clientReceivedTimestamp!);
-        sqsReceivedDate = new Date(sqsReceivedTimestamp!);
-        
-        snsTimeTakenInMillis = sqsReceivedTimestamp - snsReceivedTimestamp;
-        sqsTimeTakenInMillis = clientReceivedTimestamp - sqsReceivedTimestamp;
 
-      }else{
-        console.warn("Message does not have SentTimestamp attribute");
-      }
-
-      lastMessage = {
-        message: status,
-        sentToSnsAt: snsReceivedISODate,
-        receivedBySqsAt: sqsReceivedDate!.toISOString(),
-        receivedByClientAt: clientReceivedDate!.toISOString(),
-        snsTimeTakenInMillis: snsTimeTakenInMillis,
-        sqsTimeTakenInMillis: sqsTimeTakenInMillis,
-        snsToClientTimeTakenInMillis: snsTimeTakenInMillis! + sqsTimeTakenInMillis!,
-      };
-
+      lastMessage = sqsService.parseMessage(message);
+      
       await sqsService.deleteMessage(
         statusQueueUrl,
         message.ReceiptHandle as string
