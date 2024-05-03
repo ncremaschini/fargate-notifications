@@ -1,3 +1,4 @@
+import { AddPermissionCommand, Message } from "@aws-sdk/client-sqs";
 import {
   EventBridgeClient,
   PutRuleCommand,
@@ -9,8 +10,6 @@ import {
 } from "@aws-sdk/client-eventbridge";
 import { ISqsService, LastMessage, SqsServiceBase } from "./sqs-service-base";
 import { SubscribeSqsToEventBridgeException, UnSubscribeSqsFromEventBridgeException } from "./exceptions";
-
-import { Message } from "@aws-sdk/client-sqs";
 
 export class LastMessageEventBridge extends LastMessage {
   eventBridgeEventISODate: string;
@@ -33,7 +32,7 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
   public async bootstrapSQS(taskId: string): Promise<string> {
     
     await super.bootstrapSQS(taskId);
-    
+
     this.ruleName = 'SendTOSQS-' + taskId;
     await this.subscribeSqsToEventBridge(this.ruleName, this.EVENT_BUS_NAME!);
     
@@ -70,6 +69,17 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
     
     try {
 
+      const addPermissionCmdOut = await this.sqsClient.send(new AddPermissionCommand({
+        AWSAccountIds: ["events.amazonaws.com"],
+        Actions: ["SendMessage"],
+        Label: "EventBridge",
+        QueueUrl: this.statusQueueUrl,
+      }));
+
+      if(addPermissionCmdOut.$metadata.httpStatusCode !== 200) {
+        throw new SubscribeSqsToEventBridgeException("Failed to set queue permission for EventBridge");
+      }
+
       const putRuleCommandInput: PutRuleCommandInput = {
         Name: ruleName,
         EventBusName: eventBusName,
@@ -81,7 +91,7 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
 
       const putRuleCmdOut = await this.eventBridgeClient.send(new PutRuleCommand(putRuleCommandInput));
       if(putRuleCmdOut.$metadata.httpStatusCode !== 200) {
-        throw new SubscribeSqsToEventBridgeException("Failed to subscribe to EventBridge");
+        throw new SubscribeSqsToEventBridgeException("Failed to put rule for EventBridge");
       }
 
       const putTargetsCommandInput: PutTargetsCommandInput = {
@@ -97,7 +107,7 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
 
       const putTargetCmdOut = await this.eventBridgeClient.send(new PutTargetsCommand(putTargetsCommandInput));
       if(putTargetCmdOut.$metadata.httpStatusCode !== 200) {
-        throw new SubscribeSqsToEventBridgeException("Failed to subscribe to EventBridge");
+        throw new SubscribeSqsToEventBridgeException("Failed to put target for EventBridge");
       }
     } catch (e: any) {
       throw new SubscribeSqsToEventBridgeException(e.message);
