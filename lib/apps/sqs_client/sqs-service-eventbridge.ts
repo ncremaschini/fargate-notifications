@@ -31,9 +31,12 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
   ruleName: string;
 
   public async bootstrapSQS(taskId: string): Promise<string> {
-    this.ruleName = 'SendTOSQS-' + taskId;
+    
     await super.bootstrapSQS(taskId);
+    
+    this.ruleName = 'SendTOSQS-' + taskId;
     await this.subscribeSqsToEventBridge(this.ruleName, this.EVENT_BUS_NAME!);
+    
     return this.statusQueueUrl;
   };
 
@@ -70,6 +73,9 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
       const putRuleCommandInput: PutRuleCommandInput = {
         Name: ruleName,
         EventBusName: eventBusName,
+        EventPattern: JSON.stringify({
+          source: [{ "prefix": "" }],
+        }),
         State: "ENABLED",
       };
 
