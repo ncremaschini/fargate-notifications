@@ -11,7 +11,7 @@ export function createSqsProcessorTimetakenMetric(
   configProps: ConfigProps
 ) {
   new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-1", {
-    logGroup: appProps.queueProcessorLogGroup!,
+    logGroup: appProps.eventProcessorLogGroup!,
     metricNamespace: "Fgnt",
     metricName: "sqsTimeTaken",
     filterPattern: logs.FilterPattern.exists("$.sqsTimeTakenInMillis"),
@@ -21,7 +21,7 @@ export function createSqsProcessorTimetakenMetric(
   });
 
   new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-2", {
-    logGroup: appProps.queueProcessorLogGroup!,
+    logGroup: appProps.eventProcessorLogGroup!,
     metricNamespace: "Fgnt",
     metricName: "snsTimeTaken",
     filterPattern: logs.FilterPattern.exists("$.snsTimeTakenInMillis"),
@@ -31,7 +31,7 @@ export function createSqsProcessorTimetakenMetric(
   });
 
   new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-3", {
-    logGroup: appProps.queueProcessorLogGroup!,
+    logGroup: appProps.eventProcessorLogGroup!,
     metricNamespace: "Fgnt",
     metricName: "openPollings",
     filterPattern: logs.FilterPattern.exists("$.openPollings"),
@@ -41,7 +41,7 @@ export function createSqsProcessorTimetakenMetric(
   });
 
   new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-4", {
-    logGroup: appProps.queueProcessorLogGroup!,
+    logGroup: appProps.eventProcessorLogGroup!,
     metricNamespace: "Fgnt",
     metricName: "processedMessages",
     filterPattern: logs.FilterPattern.exists("$.processedMessages"),
@@ -51,7 +51,7 @@ export function createSqsProcessorTimetakenMetric(
   });
 
   new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-5", {
-    logGroup: appProps.queueProcessorLogGroup!,
+    logGroup: appProps.eventProcessorLogGroup!,
     metricNamespace: "Fgnt",
     metricName: "discardedMessages",
     filterPattern: logs.FilterPattern.exists("$.discardedMessages"),
@@ -61,7 +61,7 @@ export function createSqsProcessorTimetakenMetric(
   });
 
   new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-6", {
-    logGroup: appProps.queueProcessorLogGroup!,
+    logGroup: appProps.eventProcessorLogGroup!,
     metricNamespace: "Fgnt",
     metricName: "eventBridgeTimeTaken",
     filterPattern: logs.FilterPattern.exists("$.eventBridgeTimeTakenInMillis"),

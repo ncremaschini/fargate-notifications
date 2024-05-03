@@ -43,5 +43,5 @@ export type ApplicatioProps = {
     statusStreamProcessorSnsDlq? :  cdk.aws_sns.ITopic;
     statusEventBus?: cdk.aws_events.IEventBus;
     statusGraphQLApi? :cdk.aws_appsync.GraphqlApi;
-    queueProcessorLogGroup? : logs.ILogGroup;
+    eventProcessorLogGroup? : logs.ILogGroup;
  }

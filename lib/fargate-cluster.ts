@@ -139,7 +139,7 @@ function createSqsService(
     }
   );
 
-  appProps.queueProcessorLogGroup = sqsClientLogGroup;
+  appProps.eventProcessorLogGroup = sqsClientLogGroup;
 
   const sqsClientImage = new DockerImageAsset(stack, "sqs-client-image-" + channel_type, {
     directory: join(__dirname, "apps", "sqs_client"),
