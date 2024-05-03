@@ -1,5 +1,7 @@
 import {
   EventBridgeClient,
+  PutRuleCommand,
+  PutRuleCommandInput,
   PutTargetsCommand,
   PutTargetsCommandInput,
   RemoveTargetsCommand,
@@ -29,7 +31,7 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
   ruleName: string;
 
   public async bootstrapSQS(taskId: string): Promise<string> {
-    this.ruleName = 'SendTOSQS-' + this.taskID;
+    this.ruleName = 'SendTOSQS-' + taskId;
     await super.bootstrapSQS(taskId);
     await this.subscribeSqsToEventBridge(this.ruleName, this.EVENT_BUS_NAME!);
     return this.statusQueueUrl;
@@ -64,6 +66,18 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
   private subscribeSqsToEventBridge = async (ruleName: string, eventBusName: string) =>{
     
     try {
+
+      const putRuleCommandInput: PutRuleCommandInput = {
+        Name: ruleName,
+        EventBusName: eventBusName,
+        State: "ENABLED",
+      };
+
+      const putRuleCmdOut = await this.eventBridgeClient.send(new PutRuleCommand(putRuleCommandInput));
+      if(putRuleCmdOut.$metadata.httpStatusCode !== 200) {
+        throw new SubscribeSqsToEventBridgeException("Failed to subscribe to EventBridge");
+      }
+
       const putTargetsCommandInput: PutTargetsCommandInput = {
         Rule: ruleName,
         EventBusName: eventBusName,
@@ -75,8 +89,8 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
         ],
       };
 
-      const cmdOut = await this.eventBridgeClient.send(new PutTargetsCommand(putTargetsCommandInput));
-      if(cmdOut.$metadata.httpStatusCode !== 200) {
+      const putTargetCmdOut = await this.eventBridgeClient.send(new PutTargetsCommand(putTargetsCommandInput));
+      if(putTargetCmdOut.$metadata.httpStatusCode !== 200) {
         throw new SubscribeSqsToEventBridgeException("Failed to subscribe to EventBridge");
       }
     } catch (e: any) {

@@ -129,7 +129,7 @@ function createSqsService(
     iam.ManagedPolicy.fromAwsManagedPolicyName("CloudwatchFullAccess")
   )
   sqsClientTaskDefinition.taskRole.addManagedPolicy(
-    iam.ManagedPolicy.fromAwsManagedPolicyName("EventBridgeFullAccess")
+    iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonEventBridgeFullAccess")
   );
 
   const sqsClientLogGroup = new logs.LogGroup(
