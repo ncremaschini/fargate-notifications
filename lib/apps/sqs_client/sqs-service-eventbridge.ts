@@ -26,9 +26,10 @@ export class SqsServiceEventBridge extends SqsServiceBase implements ISqsService
   taskID: string;
 
   EVENT_BUS_NAME = process.env["STATUS_CHANGE_EVENT_BUS_NAME"];
-  ruleName = 'SendTOSQS-' + this.taskID;
+  ruleName: string;
 
   public async bootstrapSQS(taskId: string): Promise<string> {
+    this.ruleName = 'SendTOSQS-' + this.taskID;
     await super.bootstrapSQS(taskId);
     await this.subscribeSqsToEventBridge(this.ruleName, this.EVENT_BUS_NAME!);
     return this.statusQueueUrl;
