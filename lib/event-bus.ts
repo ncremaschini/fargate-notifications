@@ -95,7 +95,7 @@ export function createStatusEventBridge(
     target: eventBus.eventBusArn,
     targetParameters: {
       inputTemplate: `{
-        "id": <$.dynamodb.NewImage.Id.S>,
+        "id": <$.dynamodb.NewImage.id.S>,
         "status": <$.dynamodb.NewImage.status.S>
       }`,
     },

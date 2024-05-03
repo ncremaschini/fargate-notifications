@@ -51,6 +51,9 @@ export class SqsServiceSns extends SqsServiceBase implements ISqsService{
     let lastMessage: LastMessage = super.parseMessage(message);
 
     let messageBody = JSON.parse(message.Body!);
+    let statusBody = JSON.parse(messageBody.Message);
+      
+    let status = statusBody.status;
             
     //despite the name, this is the ISO Date the message was sent to the SNS topic
     let snsReceivedISODate = messageBody.Timestamp;
@@ -58,7 +61,7 @@ export class SqsServiceSns extends SqsServiceBase implements ISqsService{
     let snsReceivedTimestamp;
     let snsTimeTakenInMillis;
       
-    if (snsReceivedISODate && message.Attributes) {
+    if (snsReceivedISODate) {
           
       let snsReceivedDate = new Date(snsReceivedISODate);
       snsReceivedTimestamp = snsReceivedDate.getTime();
@@ -70,6 +73,7 @@ export class SqsServiceSns extends SqsServiceBase implements ISqsService{
     }
     let lastMessageSns: LastMessageSns = {
       ...lastMessage,
+      message: status,
       sentToSnsAt: snsReceivedISODate,
       snsTimeTakenInMillis: snsTimeTakenInMillis || 0,
       snsToClientTimeTakenInMillis: (snsTimeTakenInMillis || 0) + (lastMessage.sqsTimeTakenInMillis || 0),

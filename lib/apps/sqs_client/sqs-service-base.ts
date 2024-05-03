@@ -40,7 +40,7 @@ export interface ISqsService {
 }
 
 export class LastMessage {
-  message: string;
+  message: string | undefined;
   receivedByClientAt: string;
   receivedBySqsAt: string;
   sqsReceivedTimestamp: any;
@@ -154,20 +154,14 @@ export class SqsServiceBase implements ISqsService {
 
   public parseMessage(message: Message): LastMessage {
     let messageBody = JSON.parse(message.Body!);
-    let statusBody = JSON.parse(messageBody.Message);
-      
-    let status = statusBody.status;
-      
-    //despite the name, this is the ISO Date the message was sent to the SNS topic
-    let snsReceivedISODate = messageBody.Timestamp;
-      
+        
     let clientReceivedTimestamp;
     let clientReceivedDate;
     let sqsReceivedTimestamp;
     let sqsReceivedDate;
     let sqsTimeTakenInMillis;
       
-    if (snsReceivedISODate && message.Attributes) {
+    if (message.Attributes) {
         
       clientReceivedTimestamp = +message.Attributes.ApproximateFirstReceiveTimestamp!;
       sqsReceivedTimestamp = +message.Attributes.SentTimestamp!;
@@ -181,7 +175,7 @@ export class SqsServiceBase implements ISqsService {
       console.warn("Message does not have SentTimestamp attribute");
     }
     let lastMessage: LastMessage = {
-      message: status,
+      message: undefined,
       receivedBySqsAt: sqsReceivedDate!.toISOString(),
       receivedByClientAt: clientReceivedDate!.toISOString(),
       sqsTimeTakenInMillis: sqsTimeTakenInMillis || 0,
