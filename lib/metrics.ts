@@ -59,4 +59,14 @@ export function createSqsProcessorTimetakenMetric(
     defaultValue: 0,
     unit: cloudwatch.Unit.COUNT,
   });
+
+  new logs.MetricFilter(stack, "fgnt-sqs-processor-metric-filter-6", {
+    logGroup: appProps.queueProcessorLogGroup!,
+    metricNamespace: "Fgnt",
+    metricName: "eventBridgeTimeTaken",
+    filterPattern: logs.FilterPattern.exists("$.eventBridgeTimeTakenInMillis"),
+    metricValue: "$.eventBridgeTimeTakenInMillis",
+    defaultValue: 0,
+    unit: cloudwatch.Unit.MILLISECONDS,
+  });
 }
