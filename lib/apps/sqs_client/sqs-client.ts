@@ -1,8 +1,10 @@
+import { ISqsService, SqsServiceBase } from "./sqs-service-base";
 import express, { Request, Response } from "express";
 
-import { Message } from "@aws-sdk/client-sqs";
+import { Message, } from "@aws-sdk/client-sqs";
 import { Server } from "http";
-import { SqsService } from "./sqs-service";
+import { SqsServiceEventBridge } from "./sqs-service-eventbridge";
+import { SqsServiceSns } from "./sqs-service-sns";
 
 const gracefulShutdownTime = 6000;
 
@@ -19,6 +21,8 @@ let discardedMessages: number;
 let openPollings: number;
 
 const STATS_PRINT_MILLIS = +process.env["STATS_PRINT_MILLIS"]!;
+const CHANNEL_TYPE_SNS = "sns";
+const CHANNEL_TYPE_EVENT_BRIDGE = "ebrdg";
 
 let refreshInterval: string | number | NodeJS.Timeout | undefined;
 
@@ -32,8 +36,21 @@ app.get("/sqs", (req: Request, res: Response) => {
         )
     : res.status(503).send("Server shutting down");
 });
+const EVENT_CHANNEL = process.env["EVENT_CHANNEL"];
 
-const sqsService = new SqsService();
+let sqsService: ISqsService;
+
+switch (EVENT_CHANNEL) {
+  case CHANNEL_TYPE_SNS:
+    sqsService = new SqsServiceSns();
+    break;
+  case CHANNEL_TYPE_EVENT_BRIDGE:
+    sqsService = new SqsServiceEventBridge();
+    break;
+  default:
+    sqsService = new SqsServiceBase();
+    break;
+}
 
 getFargateTaskId()
   .then((fargateTaskId) => {
@@ -42,7 +59,7 @@ getFargateTaskId()
     discardedMessages = 0;
     openPollings = 0;
     sqsService
-      .bootrapSQS(taskId)
+      .bootstrapSQS(taskId)
       .then(async (statusQueueUrl) => {
         server = app.listen(port, () =>
           console.log(
@@ -131,56 +148,15 @@ async function printStats() {
 async function receiveMessages(statusQueueUrl: string) {
   try {
     openPollings++;
-    const messages: Array<Message> = await sqsService.receiveMessage(
-      statusQueueUrl
-    ); 
+
+    const messages: Array<Message> = await sqsService.receiveMessages(statusQueueUrl);
+
     openPollings--;
     
     for (const message of messages) {
-      let messageBody = JSON.parse(message.Body!);
-      let statusBody = JSON.parse(messageBody.Message);
-      
-      let status = statusBody.status;
-      
-      //despite the name, this is the ISO Date the message was sent to the SNS topic
-      let snsReceivedISODate = messageBody.Timestamp;
-      
-      let clientReceivedTimestamp;
-      let clientReceivedDate;
-      let sqsReceivedTimestamp;
-      let sqsReceivedDate;
-      let snsReceivedTimestamp;
-      let snsTimeTakenInMillis;
-      let sqsTimeTakenInMillis;
-    
-      if (snsReceivedISODate && message.Attributes) {
-    
-        clientReceivedTimestamp = +message.Attributes.ApproximateFirstReceiveTimestamp!;
-        sqsReceivedTimestamp = +message.Attributes.SentTimestamp!;
-        
-        let snsReceivedDate = new Date(snsReceivedISODate);
-        snsReceivedTimestamp = snsReceivedDate.getTime();
-        
-        clientReceivedDate = new Date(clientReceivedTimestamp!);
-        sqsReceivedDate = new Date(sqsReceivedTimestamp!);
-        
-        snsTimeTakenInMillis = sqsReceivedTimestamp - snsReceivedTimestamp;
-        sqsTimeTakenInMillis = clientReceivedTimestamp - sqsReceivedTimestamp;
 
-      }else{
-        console.warn("Message does not have SentTimestamp attribute");
-      }
-
-      lastMessage = {
-        message: status,
-        sentToSnsAt: snsReceivedISODate,
-        receivedBySqsAt: sqsReceivedDate!.toISOString(),
-        receivedByClientAt: clientReceivedDate!.toISOString(),
-        snsTimeTakenInMillis: snsTimeTakenInMillis,
-        sqsTimeTakenInMillis: sqsTimeTakenInMillis,
-        snsToClientTimeTakenInMillis: snsTimeTakenInMillis! + sqsTimeTakenInMillis!,
-      };
-
+      lastMessage = sqsService.parseMessage(message);
+      
       await sqsService.deleteMessage(
         statusQueueUrl,
         message.ReceiptHandle as string

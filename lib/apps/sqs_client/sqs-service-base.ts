@@ -28,47 +28,48 @@ import {
   SQSCreateException,
   SQSDeleteException,
   SetDLQPolicyException,
-  SetSQSPolicyException,
-  SubscribeToSNSException,
-  UnSubscribeFromSNSException
 } from "./exceptions";
-import {
-  SNSClient,
-  SubscribeCommand,
-  SubscribeCommandInput,
-  UnsubscribeCommand,
-  UnsubscribeCommandInput,
-} from "@aws-sdk/client-sns";
 
-export class SqsService {
+export interface ISqsService {
+  bootstrapSQS(taskId: string): Promise<string>;
+  tearDownSQS(): Promise<void>;
+  receiveMessages(queueUrl: string): Promise<Message[]>;
+  deleteMessage(queueUrl: string, receiptHandle: string): Promise<void>;
+  deleteMessages(queueUrl: string,messages:Message[]): Promise<void>;
+  parseMessage(message: Message): LastMessage;
+}
+
+export class LastMessage {
+  message: string | undefined;
+  receivedByClientAt: string;
+  receivedBySqsAt: string;
+  sqsReceivedTimestamp: any;
+  sqsTimeTakenInMillis: number;
+};
+
+export class SqsServiceBase implements ISqsService {
+  protected sqsClient: SQSClient;
+  protected cloudwatchClient: CloudWatchClient;
+  protected statusQueueUrl: string;
+  protected statusQeueArn: string;
+  protected statusDlqUrl: string;
+  protected statusDlqName: string;
+  protected statusDlqArn: string;
+  protected taskID: string;
+  
+  protected SQS_VISIBILITY_TIMEOUT_SECONDS = process.env["SQS_VISIBILITY_TIMEOUT_SECONDS"];
+  protected SQS_RECEIVE_MESSAGE_WAIT_SECONDS = process.env["SQS_RECEIVE_MESSAGE_WAIT_SECONDS"];
+  protected SQS_MAX_RECEIVE_COUNT = process.env["SQS_MAX_RECEIVE_COUNT"];
+
   constructor() {
     let sqsConfig = {};
     this.sqsClient = new SQSClient(sqsConfig);
-    
-    let snsConfig = {};
-    this.snsClient = new SNSClient(snsConfig);
-    
+      
     let cwConfig = {};
     this.cloudwatchClient = new CloudWatchClient(cwConfig);
   }
   
-  sqsClient: SQSClient;
-  snsClient: SNSClient;
-  cloudwatchClient: CloudWatchClient;
-  statusQueueUrl: string;
-  statusQeueArn: string;
-  snsSubscriptionArn: string | undefined;
-  statusDlqUrl: string;
-  statusDlqName: string;
-  statusDlqArn: string;
-  taskID: string;
-  
-  SNS_ARN = process.env["STATUS_CHANGE_SNS_ARN"];
-  SQS_VISIBILITY_TIMEOUT_SECONDS = process.env["SQS_VISIBILITY_TIMEOUT_SECONDS"];
-  SQS_RECEIVE_MESSAGE_WAIT_SECONDS = process.env["SQS_RECEIVE_MESSAGE_WAIT_SECONDS"];
-  SQS_MAX_RECEIVE_COUNT = process.env["SQS_MAX_RECEIVE_COUNT"];
-  
-  bootrapSQS = async (taskId: string) => {
+  public async bootstrapSQS (taskId: string): Promise<string>{
     this.taskID = taskId;
     this.statusDlqName = taskId + "-dlq";
     this.statusDlqUrl = await this.createSqs(this.statusDlqName);
@@ -80,32 +81,111 @@ export class SqsService {
     this.statusQeueArn = await this.getSQSAttributes(this.statusQueueUrl);
     console.log("status SQS URL: ", this.statusQueueUrl);
 
-    await this.setSNSPolicy(
-      this.statusQeueArn,
-      this.statusQueueUrl,
-      this.SNS_ARN!
-    );
     await this.setDLQPolicy(
       this.statusQeueArn,
       this.statusDlqUrl,
       this.statusDlqArn
     );
 
-    this.snsSubscriptionArn = await this.subscribeSqsToSns(this.statusQeueArn, this.SNS_ARN!);
-
     await this.createAlarmOnQueue(this.statusDlqName);
 
     return this.statusQueueUrl;
   };
 
-  tearDownSQS = async () => {
+  public async tearDownSQS(){
     await this.deleteQueue(this.statusQueueUrl);
     await this.deleteQueue(this.statusDlqUrl);
     await this.deleteAlarmOnQueue(this.statusDlqName);
-    await this.deleteSqsSnsSubscription(this.snsSubscriptionArn!);
   };
 
-  deleteQueue = async (queueUrl: string) => {
+  public async receiveMessages(queueUrl: string){
+    let messages: Array<Message> = [];
+    try {
+      let receiveMessageCommandInput: ReceiveMessageCommandInput = {
+        AttributeNames: ["All"],
+        QueueUrl: queueUrl,
+        WaitTimeSeconds: +this.SQS_RECEIVE_MESSAGE_WAIT_SECONDS!,
+      };
+
+      let receiveMessageCommand = new ReceiveMessageCommand(
+        receiveMessageCommandInput
+      );
+
+      const receiveMessageCommandOutput: ReceiveMessageCommandOutput =
+        await this.sqsClient.send(receiveMessageCommand);
+      if (
+        receiveMessageCommandOutput.Messages !== undefined &&
+        receiveMessageCommandOutput.Messages.length > 0
+      ) {
+        messages = receiveMessageCommandOutput.Messages;
+      }
+    } catch (e: any) {
+      throw new ReceiveSQSMessageException(e?.message);
+    }
+    return messages;
+  };
+
+  public async deleteMessage(queueUrl: string, receiptHandle: string){
+    try {
+      const deleteMessageCommandInput: DeleteMessageCommandInput = {
+        QueueUrl: queueUrl,
+        ReceiptHandle: receiptHandle,
+      };
+
+      const deleteMessageCommand = new DeleteMessageCommand(
+        deleteMessageCommandInput
+      );
+
+      await this.sqsClient.send(deleteMessageCommand);
+    } catch (e: any) {
+      throw new DeleteQueueMessageException(e.message);
+    }
+  };
+
+  public async deleteMessages(queueUrl: string,messages:Message[]){
+    if (messages.length > 0) {
+      for (const message of messages) {
+        if (message.ReceiptHandle) {
+          this.deleteMessage(queueUrl, message.ReceiptHandle as string);
+        }
+      }
+    }
+  }
+
+  public parseMessage(message: Message): LastMessage {
+    let messageBody = JSON.parse(message.Body!);
+        
+    let clientReceivedTimestamp;
+    let clientReceivedDate;
+    let sqsReceivedTimestamp;
+    let sqsReceivedDate;
+    let sqsTimeTakenInMillis;
+      
+    if (message.Attributes) {
+        
+      clientReceivedTimestamp = +message.Attributes.ApproximateFirstReceiveTimestamp!;
+      sqsReceivedTimestamp = +message.Attributes.SentTimestamp!;
+          
+      clientReceivedDate = new Date(clientReceivedTimestamp!);
+      sqsReceivedDate = new Date(sqsReceivedTimestamp!);
+      
+      sqsTimeTakenInMillis = clientReceivedTimestamp - sqsReceivedTimestamp;
+        
+    }else{
+      console.warn("Message does not have SentTimestamp attribute");
+    }
+    let lastMessage: LastMessage = {
+      message: undefined,
+      receivedBySqsAt: sqsReceivedDate!.toISOString(),
+      receivedByClientAt: clientReceivedDate!.toISOString(),
+      sqsTimeTakenInMillis: sqsTimeTakenInMillis || 0,
+      sqsReceivedTimestamp: sqsReceivedTimestamp,
+    };
+
+    return lastMessage;
+  }
+
+  private async deleteQueue(queueUrl: string){
     try {
       const deleteQueueCommand = new DeleteQueueCommand({
         QueueUrl: queueUrl,
@@ -123,7 +203,7 @@ export class SqsService {
     }
   };
 
-  createSqs = async (
+  private createSqs = async (
     queueName: string,
     dlqArn: string | undefined = undefined
   ) => {
@@ -158,7 +238,7 @@ export class SqsService {
     return result;
   };
 
-  getSQSAttributes = async (queueUrl: string) => {
+  private getSQSAttributes = async (queueUrl: string) => {
     let queueArn: string = "";
     try {
       const getAttributesCommand = new GetQueueAttributesCommand({
@@ -180,45 +260,8 @@ export class SqsService {
     return queueArn;
   };
 
-  setSNSPolicy = async (
-    queueArn: string,
-    queueUrl: string,
-    sns_arn: string
-  ) => {
-    try {
-      let policy = JSON.stringify({
-        Statement: [
-          {
-            Effect: "Allow",
-            Principal: {
-              Service: "sns.amazonaws.com",
-            },
-            Action: "sqs:SendMessage",
-            Resource: queueArn,
-            Condition: {
-              ArnEquals: {
-                "aws:SourceArn": sns_arn,
-              },
-            },
-          },
-        ],
-      });
-      const setCommandInput = {
-        QueueUrl: queueUrl,
-        Attributes: {
-          Policy: policy,
-        },
-      };
 
-      const setCommand = new SetQueueAttributesCommand(setCommandInput);
-
-      await this.sqsClient.send(setCommand);
-    } catch (e: any) {
-      throw new SetSQSPolicyException(e.message);
-    }
-  };
-
-  setDLQPolicy = async (queueArn: string, dlqUrl: string, dlqArn: string) => {
+  private setDLQPolicy = async (queueArn: string, dlqUrl: string, dlqArn: string) => {
     try {
       let policy = JSON.stringify({
         Statement: [
@@ -252,93 +295,7 @@ export class SqsService {
     }
   };
 
-  subscribeSqsToSns = async (queueArn: string, snsArn: string) => {
-    try {
-      const snsSubscribeCommandInput: SubscribeCommandInput = {
-        Endpoint: queueArn,
-        Protocol: "sqs",
-        TopicArn: snsArn,
-      };
-      const snsSubscribeCommand = new SubscribeCommand(
-        snsSubscribeCommandInput
-      );
-      const cmdOut =  await this.snsClient.send(snsSubscribeCommand);
-      return cmdOut.SubscriptionArn;
-    } catch (e: any) {
-      throw new SubscribeToSNSException(e.message);
-    }
-  };
-
-  deleteSqsSnsSubscription = async (subscriptionArn: string) => {
-    try {
-      const snsUnsubscribeCommandInput: UnsubscribeCommandInput = {
-        SubscriptionArn: subscriptionArn,
-      };
-      const snsUnsubscribeCommand = new UnsubscribeCommand(
-        snsUnsubscribeCommandInput
-      );
-      await this.snsClient.send(snsUnsubscribeCommand);
-      console.log(`Subscription ${subscriptionArn} deleted`);
-    } catch (e: any) {
-      throw new UnSubscribeFromSNSException(e.message);
-    }
-  }
-
-  receiveMessage = async (queueUrl: string) => {
-    let messages: Array<Message> = [];
-    try {
-      let receiveMessageCommandInput: ReceiveMessageCommandInput = {
-        AttributeNames: ["All"],
-        QueueUrl: queueUrl,
-        WaitTimeSeconds: +this.SQS_RECEIVE_MESSAGE_WAIT_SECONDS!,
-      };
-
-      let receiveMessageCommand = new ReceiveMessageCommand(
-        receiveMessageCommandInput
-      );
-
-      const receiveMessageCommandOutput: ReceiveMessageCommandOutput =
-        await this.sqsClient.send(receiveMessageCommand);
-      if (
-        receiveMessageCommandOutput.Messages !== undefined &&
-        receiveMessageCommandOutput.Messages.length > 0
-      ) {
-        messages = receiveMessageCommandOutput.Messages;
-      }
-    } catch (e: any) {
-      throw new ReceiveSQSMessageException(e?.message);
-    }
-    return messages;
-  };
-
-  deleteMessages = async (queueUrl: string,messages:Message[]) => {
-    if (messages.length > 0) {
-      for (const message of messages) {
-        if (message.ReceiptHandle) {
-          this.deleteMessage(queueUrl, message.ReceiptHandle as string);
-        }
-      }
-    }
-  }
-
-  deleteMessage = async (queueUrl: string, receiptHandle: string) => {
-    try {
-      const deleteMessageCommandInput: DeleteMessageCommandInput = {
-        QueueUrl: queueUrl,
-        ReceiptHandle: receiptHandle,
-      };
-
-      const deleteMessageCommand = new DeleteMessageCommand(
-        deleteMessageCommandInput
-      );
-
-      await this.sqsClient.send(deleteMessageCommand);
-    } catch (e: any) {
-      throw new DeleteQueueMessageException(e.message);
-    }
-  };
-
-  createAlarmOnQueue = async (queueName: string) => {
+  private createAlarmOnQueue = async (queueName: string) => {
     const alarmName = `TooManyMessagesOn-${queueName}`;
 
     const command = new PutMetricAlarmCommand({
@@ -416,7 +373,7 @@ export class SqsService {
     }
   };
 
-  deleteAlarmOnQueue = async (queueName: string) => {
+  private deleteAlarmOnQueue = async (queueName: string) => {
     const command = new DeleteAlarmsCommand({
       AlarmNames: [`TooManyMessagesOn-${queueName}`],
     });
@@ -429,3 +386,4 @@ export class SqsService {
     }
   };
 }
+
