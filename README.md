@@ -2,7 +2,7 @@
 
 This project is a simple CDK project that deploys a Fargate service with containers that receive notification of dynamic changes leveraging fan-out pattern based on SNS and SQS.
 
-## The project
+## The project v1
 The scope of the project is to measure time taken by each components in the chain to process events down to the Fargate service. The project is composed by the following components:
 - AppSync API: it's the entry point for the events. It's a GraphQL API that accepts mutations to send events to the Fargate service.
 - DynamoDB: it's used to store the events
@@ -26,6 +26,22 @@ Custome metrics are also created to measure the time taken by each component to 
 Here an example board
 ![Cloudwatch dashboard](./docs/cloudwatch-dashboard.png)
 
+## The project v2
+The version 2 is composed by the following components:
+- AppSync API: it's the entry point for the events. It's a GraphQL API that accepts mutations to send events to the Fargate service.
+- DynamoDB: it's used to store the events
+- Dynamo stream: it's used to trigger the Lambda function that sends the events to the SNS topic
+- EventBridge: it's used to fanout the events to the SQS queues
+- SQS: it's used to buffer the events before sending them to the Fargate service single containers
+
+![Architecture](./docs/hld_2.png)
+
+1. The AppSync API receives mutations and stores derived data in the DynamoDB table
+2. The DynamoDB stream the events 
+3. EventBridge is used to filter, transform and fanout the events to the SQS queues
+4. The Fargate service reads the events from the SQS queues
+5. If events are not processed within a timeout, they are moved to the DLQ
+6. A Cloudwatch alarm is triggered if the DLQ is not empty
 
 ## How to deploy
 Use the .env file to set the environment variables. The following variables are required:
@@ -38,7 +54,8 @@ Use the .env file to set the environment variables. The following variables are 
 - SQS_VISIBILITY_TIMEOUT: the visibility timeout in seconds for the SQS queues
 - SQS_RECEIVE_MESSAGE_WAIT_SECONDS: the time in seconds to wait for messages to be available in the SQS queues before polling again
 - SQS_MAX_RECEIVE_COUNT: the maximum number of times a message can be received before being sent to the DLQ
-- STREAM_PROCESSOR_LAMBDA_MEMORY: Dynamo stream processor lambda memory
+- STREAM_PROCESSOR_LAMBDA_MEMORY: Dynamo stream processor lambda memory. Used only if channel type is `sns`
+- CHANNEL_TYPE: the type of channel to use to fanout the events. It can be `sns` or `ebrdg`
 
 At the first run you need to bootstrap the CDK environment with the following command:
 ```bash
@@ -80,7 +97,15 @@ The application exposes an endpoint to retrieve single task informations: its ex
 Since application is behind a load balancer, at each invocation the request is routed to a different task, so you can see the load balancing in action.
 
 ## How to monitor
-As messages starts to flow in the system deployed metrics filters start to grab informations, so you can create a dashboard to monitor the application using custom metrics created under `Fgnt` namespace and called `sqsTimeTakenMillis`, `snsTimeTakenMillis`, `openPollings`,`processedMessages` and `discardedMessages`, along with provided metrics such as `CPUUtilization` and `MemoryUtilization`.
+As messages starts to flow in the system deployed metrics filters start to grab informations, so you can create a dashboard to monitor the application using custom metrics created under `Fgnt` namespace and called: 
+- sqsTimeTakenMillis
+- snsTimeTakenMillis: just for [version 1 of the project](#the-project-v1)
+- openPollings
+- processedMessages
+- discardedMessages
+  
+along with provided metrics such as `CPUUtilization` and `MemoryUtilization`.
+Time taken metrics for Eventbridge are provided by the `EventBridge` service, called `IngestiontoInvocationCompleteLatency` and `IngestiontoInvocationStartLatency`.
 
 ![Stats](./docs/message_stats.png)
 
