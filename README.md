@@ -99,7 +99,7 @@ Since application is behind a load balancer, at each invocation the request is r
 ## How to monitor
 As messages starts to flow in the system deployed metrics filters start to grab informations, so you can create a dashboard to monitor the application using custom metrics created under `Fgnt` namespace and called: 
 - sqsTimeTakenMillis
-- snsTimeTakenMillis: just for [version 1 of the project](#the-project-v1)
+- snsTimeTakenMillis: only for [version 1 of the project](#the-project-v1)
 - openPollings
 - processedMessages
 - discardedMessages
