@@ -39,31 +39,86 @@ test('DynamoDB Table Created', () => {
 );
 
 //test lambda function
-test('Stream processor Lambda Function Created', () => {
-    const app = new cdk.App();
-    // WHEN
-    const stack = new FargateNotifications.FargateNotificationsStack(app
-        , 'MyTestStack'
-        , {});
-    // THEN
-    const template = Template.fromStack(stack);
-    template.hasResourceProperties('AWS::Lambda::Function', {
-        Handler: 'index.handler'
+if (process.env.CHANNEL_TYPE === 'sns') {
+    test('Stream processor Lambda Function Created', () => {
+        const app = new cdk.App();
+        // WHEN
+        const stack = new FargateNotifications.FargateNotificationsStack(app
+            , 'MyTestStack'
+            , {});
+        // THEN
+        const template = Template.fromStack(stack);
+        template.hasResourceProperties('AWS::Lambda::Function', {
+            Handler: 'index.handler'
+        });
     });
-}
-);
 
-//test sns topic
-test('SNS Topic Created', () => {
-    const app = new cdk.App();
-    // WHEN
-    const stack = new FargateNotifications.FargateNotificationsStack(app
-        , 'MyTestStack'
-        , {});
-    // THEN
-    const template = Template.fromStack(stack);
-    template.hasResourceProperties('AWS::SNS::Topic', {
-        TopicName: 'fgtn-status-change',
-    });
+    //test sns topic
+    test('SNS Topic Created', () => {
+        const app = new cdk.App();
+        // WHEN
+        const stack = new FargateNotifications.FargateNotificationsStack(app
+            , 'MyTestStack'
+            , {});
+        // THEN
+        const template = Template.fromStack(stack);
+        template.hasResourceProperties('AWS::SNS::Topic', {
+            TopicName: 'fgtn-status-change',
+        });
+    }
+    );
 }
-);
+
+if (process.env.CHANNEL_TYPE === 'ebrdg') {
+    //test EventBridge bus created
+    test('EventBridge Bus Created', () => {
+        const app = new cdk.App();
+        // WHEN
+        const stack = new FargateNotifications.FargateNotificationsStack(app
+            , 'MyTestStack'
+            , {});
+        // THEN
+        const template = Template.fromStack(stack);
+        template.hasResourceProperties('AWS::Events::EventBus', {
+            Name: 'fgtn-status-change'
+        });
+    }
+    );
+
+    //test EventBridge pipe created
+    test('EventBridge Pipe Created', () => {
+        const app = new cdk.App();
+        // WHEN
+        const stack = new FargateNotifications.FargateNotificationsStack(app
+            , 'MyTestStack'
+            , {});
+        // THEN
+        const template = Template.fromStack(stack);
+        template.hasResourceProperties('AWS::Pipes::Pipe', {
+            Name: 'fgtn-status-change-pipe'
+        });
+    }
+    );
+
+    //verify event bridge pipe source is dynamo stream
+    test('EventBridge Pipe Source Dynamo Stream', () => {
+        const app = new cdk.App();
+        // WHEN
+        const stack = new FargateNotifications.FargateNotificationsStack(app
+            , 'MyTestStack'
+            , {});
+        // THEN
+        const template = Template.fromStack(stack);
+        template.hasResourceProperties('AWS::Pipes::Pipe', {
+            Name: 'fgtn-status-change-pipe',
+            Source: {
+                "Fn::GetAtt": [
+                    "FgntStatusTableDD6E1544",
+                    "StreamArn"
+                ]
+            }
+        });
+    }
+    );
+}
+
