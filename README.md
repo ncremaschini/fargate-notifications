@@ -38,10 +38,11 @@ The version 2 is composed by the following components:
 
 1. The AppSync API receives mutations and stores derived data in the DynamoDB table
 2. The DynamoDB stream the events 
-3. EventBridge is used to filter, transform and fanout the events to the SQS queues
-4. The Fargate service reads the events from the SQS queues
-5. If events are not processed within a timeout, they are moved to the DLQ
-6. A Cloudwatch alarm is triggered if the DLQ is not empty
+3. EventBridge is used to filter, transform and...
+4. ...fan-outs events to the SQS queues
+5. The Fargate service reads the events from the SQS queues
+6. If events are not processed within a timeout, they are moved to the DLQ
+7. A Cloudwatch alarm is triggered if the DLQ is not empty
 
 ## How to deploy
 Use the .env file to set the environment variables. The following variables are required:
